@@ -225,23 +225,49 @@ def _normalize_resultado(
 
 
 def load_financial_data(file_path: Path, config: AppConfig, logger) -> FinancialData:
+    """Load and validate financial data from Excel file.
+    
+    Args:
+        file_path: Path to the Excel file
+        config: Application configuration
+        logger: Logger instance
+        
+    Returns:
+        FinancialData object with loaded and normalized data
+        
+    Raises:
+        ValueError: If required sheets are missing or data is invalid
+        FileNotFoundError: If file doesn't exist
+    """
     workbook = pd.ExcelFile(file_path)
     logger.debug("Available sheets: %s", workbook.sheet_names)
 
+    # Validate all required sheets exist before processing
+    required_sheets = ["INFORME-ERI", "ESTADO RESULTADO", "CARATULA"]
     current_month = detect_current_month(file_path, config.month_order)
     balance_sheet = f"BALANCE {current_month}"
-    if balance_sheet not in workbook.sheet_names:
-        raise ValueError(f"Sheet '{balance_sheet}' not found in workbook")
+    required_sheets.append(balance_sheet)
+    
+    missing_sheets = [sheet for sheet in required_sheets if sheet not in workbook.sheet_names]
+    if missing_sheets:
+        available_sheets = ", ".join(workbook.sheet_names)
+        raise ValueError(
+            f"Required sheets missing: {', '.join(missing_sheets)}. "
+            f"Available sheets: {available_sheets}"
+        )
 
-    df_balance = pd.read_excel(workbook, sheet_name=balance_sheet, skiprows=4)
-    df_eri = pd.read_excel(workbook, sheet_name="INFORME-ERI", skiprows=1)
-    df_resultado = pd.read_excel(
-        workbook,
-        sheet_name="ESTADO RESULTADO",
-        skiprows=2,
-        header=[0, 1],
-    )
-    df_caratula = pd.read_excel(workbook, sheet_name="CARATULA", skiprows=5)
+    try:
+        df_balance = pd.read_excel(workbook, sheet_name=balance_sheet, skiprows=4)
+        df_eri = pd.read_excel(workbook, sheet_name="INFORME-ERI", skiprows=1)
+        df_resultado = pd.read_excel(
+            workbook,
+            sheet_name="ESTADO RESULTADO",
+            skiprows=2,
+            header=[0, 1],
+        )
+        df_caratula = pd.read_excel(workbook, sheet_name="CARATULA", skiprows=5)
+    except Exception as e:
+        raise ValueError(f"Failed to read Excel sheets: {e}")
 
     df_balance = _normalize_balance(df_balance, current_month, config.month_order)
     df_eri, months, current_month_col = _normalize_eri(df_eri, current_month, config.month_order)

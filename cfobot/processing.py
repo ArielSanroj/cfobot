@@ -9,6 +9,24 @@ import numpy as np
 import pandas as pd
 
 from .config import AppConfig
+from .constants import (
+    ADMIN_EXPENSES_PATTERN,
+    OTHER_EXPENSES_PATTERN,
+    SALES_COSTS_PATTERN,
+    PRODUCTION_COSTS_PATTERN,
+    DEPRECIATION_PATTERNS,
+    INTEREST_PATTERNS,
+    SALARY_PATTERNS,
+    SEVERANCE_PATTERNS,
+    ASSET_CLASS_CODE,
+    LIABILITY_CLASS_CODE,
+    EQUITY_CLASS_CODE,
+    CURRENT_ASSET_GROUPS,
+    INVENTORY_GROUP_CODE,
+    INCOME_DESCRIPTION,
+    COST_DESCRIPTION,
+    PROFIT_DESCRIPTION,
+)
 from .data_loader import FinancialData
 
 
@@ -59,23 +77,44 @@ def consolidate_balance(data: FinancialData, config: AppConfig) -> pd.DataFrame:
     return consolidated[consolidated["Nivel"] == "Clase"].copy()
 
 
-def compute_budget_execution(data: FinancialData, config: AppConfig) -> BudgetResult:
-    # Get income from income statement
+def _calculate_income(data: FinancialData) -> float:
+    """Calculate actual income from income statement.
+    
+    Args:
+        data: Financial data containing income statement
+        
+    Returns:
+        Actual income amount
+    """
     ingresos_series = data.resultado[
-        data.resultado["Descripcion"].str.contains("INGRESOS ORDINARIOS", case=False, na=False)
+        data.resultado["Descripcion"].str.contains(INCOME_DESCRIPTION, case=False, na=False)
     ][data.resultado_current_col]
-    actual_ingresos = abs(float(ingresos_series.iloc[0])) if not ingresos_series.empty else 0.0
+    return abs(float(ingresos_series.iloc[0])) if not ingresos_series.empty else 0.0
 
+
+def _categorize_expenses(data: FinancialData) -> tuple[dict[str, float], dict[str, float]]:
+    """Categorize expenses into different types.
+    
+    Args:
+        data: Financial data containing ERI information
+        
+    Returns:
+        Tuple of (base_expenses, extra_expenses) dictionaries
+    """
     # Enhanced expense categorization with better mapping
     base_masks = {
-        "gastos_admin": data.eri["Codigo"].str.match(r"^51[0-9]{4,}", na=False),
-        "gastos_otros": data.eri["Codigo"].str.match(r"^53[0-9]{4,}", na=False),
-        "costos_venta": data.eri["Codigo"].str.match(r"^61[0-9]{4,}", na=False),
-        "costos_prod": data.eri["Codigo"].str.match(r"^(72|73)[0-9]{4,}", na=False),
+        "gastos_admin": data.eri["Codigo"].str.match(ADMIN_EXPENSES_PATTERN, na=False),
+        "gastos_otros": data.eri["Codigo"].str.match(OTHER_EXPENSES_PATTERN, na=False),
+        "costos_venta": data.eri["Codigo"].str.match(SALES_COSTS_PATTERN, na=False),
+        "costos_prod": data.eri["Codigo"].str.match(PRODUCTION_COSTS_PATTERN, na=False),
     }
 
-    sueldos_mask = base_masks["gastos_admin"] & data.eri["Display Name"].str.contains("SUELDO|SALARIO", case=False, na=False)
-    cesantias_mask = base_masks["gastos_admin"] & data.eri["Display Name"].str.contains("CESANTIA", case=False, na=False)
+    # Additional categorization for salaries and severance
+    salary_pattern = "|".join(SALARY_PATTERNS)
+    severance_pattern = "|".join(SEVERANCE_PATTERNS)
+    
+    sueldos_mask = base_masks["gastos_admin"] & data.eri["Display Name"].str.contains(salary_pattern, case=False, na=False)
+    cesantias_mask = base_masks["gastos_admin"] & data.eri["Display Name"].str.contains(severance_pattern, case=False, na=False)
     extra_masks = {
         "sueldos": sueldos_mask,
         "cesantias": cesantias_mask,
@@ -90,17 +129,38 @@ def compute_budget_execution(data: FinancialData, config: AppConfig) -> BudgetRe
         name: abs(float(data.eri.loc[mask, current_col].sum()))
         for name, mask in extra_masks.items()
     }
-    actual_total_gastos = sum(gastos_values.values())
+    
+    return gastos_values, extra_values
 
+
+def _build_budget_summary(
+    data: FinancialData, 
+    config: AppConfig, 
+    actual_ingresos: float, 
+    actual_total_gastos: float,
+    gastos_values: dict[str, float]
+) -> pd.DataFrame:
+    """Build budget execution summary table.
+    
+    Args:
+        data: Financial data
+        config: Application configuration
+        actual_ingresos: Actual income amount
+        actual_total_gastos: Total actual expenses
+        gastos_values: Categorized expense values
+        
+    Returns:
+        Summary DataFrame
+    """
     # Calculate budget execution percentages
     ejecutado_ingresos_pct = (
         (actual_ingresos / config.budgets.ingresos_mensual) * 100
-        if config.budgets.ingresos_mensual
+        if config.budgets.ingresos_mensual > 0
         else 0
     )
     ejecutado_gastos_pct = (
         (actual_total_gastos / config.budgets.gastos_mensual) * 100
-        if config.budgets.gastos_mensual
+        if config.budgets.gastos_mensual > 0
         else 0
     )
 
@@ -114,37 +174,98 @@ def compute_budget_execution(data: FinancialData, config: AppConfig) -> BudgetRe
         ["Costos de Producción", gastos_values["costos_prod"], 0, 0],
     ]
 
-    summary = pd.DataFrame(
+    return pd.DataFrame(
         summary_data,
         columns=["Categoría", f"Actual {data.current_month}", "Presupuesto Mensual", "% Ejecutado"]
     )
 
-    # Enhanced distribution analysis
-    distribution = pd.DataFrame()
-    if actual_total_gastos:
-        months = list(data.months)
-        previous_index = max(months.index(current_col) - 1, 0)
-        previous_month = months[previous_index]
-        relevant_mask = np.logical_or.reduce(tuple(base_masks.values()) + tuple(extra_masks.values()))
-        distribution = data.eri.loc[relevant_mask, ["Display Name"] + months].copy()
-        distribution.set_index("Display Name", inplace=True)
-        distribution[months] = distribution[months].abs()
-        distribution["Average Jan-Current"] = distribution[months].mean(axis=1)
-        distribution[f"% Diff vs {previous_month.split()[0]}"] = (
-            (
-                distribution[current_col] - distribution[previous_month]
-            )
-            / distribution[previous_month].replace(0, np.nan)
-        ).fillna(0) * 100
-        distribution["% vs Average"] = (
-            (
-                distribution[current_col] - distribution["Average Jan-Current"]
-            )
-            / distribution["Average Jan-Current"].replace(0, np.nan)
-        ).fillna(0) * 100
-        distribution[f"% del Total {data.current_month}"] = (
-            distribution[current_col] / actual_total_gastos * 100
+
+def _build_expense_distribution(
+    data: FinancialData, 
+    base_masks: dict[str, pd.Series], 
+    extra_masks: dict[str, pd.Series],
+    actual_total_gastos: float
+) -> pd.DataFrame:
+    """Build expense distribution analysis.
+    
+    Args:
+        data: Financial data
+        base_masks: Base expense category masks
+        extra_masks: Additional expense category masks
+        actual_total_gastos: Total actual expenses
+        
+    Returns:
+        Distribution analysis DataFrame
+    """
+    if not actual_total_gastos:
+        return pd.DataFrame()
+    
+    months = list(data.months)
+    current_col = data.current_month_col
+    previous_index = max(months.index(current_col) - 1, 0)
+    previous_month = months[previous_index]
+    
+    relevant_mask = np.logical_or.reduce(tuple(base_masks.values()) + tuple(extra_masks.values()))
+    distribution = data.eri.loc[relevant_mask, ["Display Name"] + months].copy()
+    distribution.set_index("Display Name", inplace=True)
+    distribution[months] = distribution[months].abs()
+    distribution["Average Jan-Current"] = distribution[months].mean(axis=1)
+    distribution[f"% Diff vs {previous_month.split()[0]}"] = (
+        (
+            distribution[current_col] - distribution[previous_month]
         )
+        / distribution[previous_month].replace(0, np.nan)
+    ).fillna(0) * 100
+    distribution["% vs Average"] = (
+        (
+            distribution[current_col] - distribution["Average Jan-Current"]
+        )
+        / distribution["Average Jan-Current"].replace(0, np.nan)
+    ).fillna(0) * 100
+    distribution[f"% del Total {data.current_month}"] = (
+        distribution[current_col] / actual_total_gastos * 100
+    )
+    
+    return distribution
+
+
+def compute_budget_execution(data: FinancialData, config: AppConfig) -> BudgetResult:
+    """Calculate budget execution analysis.
+    
+    Args:
+        data: Financial data containing income statement and ERI
+        config: Application configuration with budget settings
+        
+    Returns:
+        BudgetResult with summary and distribution analysis
+    """
+    # Get income from income statement
+    actual_ingresos = _calculate_income(data)
+
+    # Categorize expenses
+    gastos_values, extra_values = _categorize_expenses(data)
+    actual_total_gastos = sum(gastos_values.values())
+
+    # Build summary table
+    summary = _build_budget_summary(data, config, actual_ingresos, actual_total_gastos, gastos_values)
+
+    # Build expense distribution analysis
+    base_masks = {
+        "gastos_admin": data.eri["Codigo"].str.match(ADMIN_EXPENSES_PATTERN, na=False),
+        "gastos_otros": data.eri["Codigo"].str.match(OTHER_EXPENSES_PATTERN, na=False),
+        "costos_venta": data.eri["Codigo"].str.match(SALES_COSTS_PATTERN, na=False),
+        "costos_prod": data.eri["Codigo"].str.match(PRODUCTION_COSTS_PATTERN, na=False),
+    }
+    
+    salary_pattern = "|".join(SALARY_PATTERNS)
+    severance_pattern = "|".join(SEVERANCE_PATTERNS)
+    
+    extra_masks = {
+        "sueldos": base_masks["gastos_admin"] & data.eri["Display Name"].str.contains(salary_pattern, case=False, na=False),
+        "cesantias": base_masks["gastos_admin"] & data.eri["Display Name"].str.contains(severance_pattern, case=False, na=False),
+    }
+    
+    distribution = _build_expense_distribution(data, base_masks, extra_masks, actual_total_gastos)
 
     return BudgetResult(
         summary=summary,
@@ -156,60 +277,117 @@ def compute_budget_execution(data: FinancialData, config: AppConfig) -> BudgetRe
     )
 
 
-def compute_kpis(data: FinancialData, budget: BudgetResult) -> KPIResult:
-    balance = data.balance
-    resultado = data.resultado
+def _sum_for_balance(balance: pd.DataFrame, level: str, codes: Sequence[str]) -> float:
+    """Sum balance sheet values for specific level and codes.
+    
+    Args:
+        balance: Balance sheet DataFrame
+        level: Account level (Clase, Grupo, etc.)
+        codes: List of account codes to sum
+        
+    Returns:
+        Sum of balance values
+    """
+    frame = balance[(balance["Nivel"] == level) & balance["Código cuenta contable"].isin(codes)]
+    return float(frame["Saldo final"].sum()) if not frame.empty else 0.0
 
-    def _sum_for(level: str, codes: Sequence[str]) -> float:
-        frame = balance[(balance["Nivel"] == level) & balance["Código cuenta contable"].isin(codes)]
-        return float(frame["Saldo final"].sum()) if not frame.empty else 0.0
 
-    # Get assets, liabilities, and equity from Clase level
-    total_assets = _sum_for("Clase", ["1"])
-    current_assets = _sum_for("Grupo", ["11", "12", "13", "14"])
-    inventories = _sum_for("Grupo", ["14"])
-    current_liabilities = abs(_sum_for("Clase", ["2"]))
-    equity = abs(_sum_for("Clase", ["3"])) or max(total_assets - current_liabilities, 0)
-
-    # Get income statement data
+def _get_income_statement_data(resultado: pd.DataFrame, current_col: str) -> tuple[float, float, float]:
+    """Extract key values from income statement.
+    
+    Args:
+        resultado: Income statement DataFrame
+        current_col: Current month column name
+        
+    Returns:
+        Tuple of (costs, profit, income)
+    """
     costos_series = resultado[
-        resultado["Descripcion"].str.contains("COSTO DE VENTA", case=False, na=False)
-    ][data.resultado_current_col]
+        resultado["Descripcion"].str.contains(COST_DESCRIPTION, case=False, na=False)
+    ][current_col]
     utilidad_series = resultado[
-        resultado["Descripcion"].str.contains("RESULTADO DEL EJERCICIO", case=False, na=False)
-    ][data.resultado_current_col]
+        resultado["Descripcion"].str.contains(PROFIT_DESCRIPTION, case=False, na=False)
+    ][current_col]
+    ingresos_series = resultado[
+        resultado["Descripcion"].str.contains(INCOME_DESCRIPTION, case=False, na=False)
+    ][current_col]
 
     costos = abs(float(costos_series.max())) if not costos_series.empty else 0.0
     utilidad = float(utilidad_series.max()) if not utilidad_series.empty else 0.0
+    ingresos = abs(float(ingresos_series.max())) if not ingresos_series.empty else 0.0
+    
+    return costos, utilidad, ingresos
 
-    # Enhanced EBITDA calculation - get depreciation and interest from ERI
-    # Depreciation typically in 51xxxx accounts (administrative expenses)
-    depreciacion_mask = data.eri["Codigo"].str.match(r"^51[0-9]{4}", na=False)
+
+def _calculate_ebitda_components(data: FinancialData) -> tuple[float, float]:
+    """Calculate depreciation and interest for EBITDA calculation.
+    
+    Args:
+        data: Financial data containing ERI
+        
+    Returns:
+        Tuple of (depreciation, interest)
+    """
+    # Depreciation: filter by account name containing "DEPRECIACION" or "AMORTIZACION"
+    depreciation_pattern = "|".join(DEPRECIATION_PATTERNS)
+    depreciacion_mask = data.eri["Display Name"].str.contains(
+        depreciation_pattern, case=False, na=False
+    )
     depreciacion = abs(float(data.eri.loc[depreciacion_mask, data.current_month_col].sum()))
     
-    # Interest expenses typically in 53xxxx accounts
-    intereses_mask = data.eri["Codigo"].str.match(r"^53[0-9]{4}", na=False)
+    # Interest expenses: filter by account name containing "INTERES"
+    interest_pattern = "|".join(INTEREST_PATTERNS)
+    intereses_mask = data.eri["Display Name"].str.contains(
+        interest_pattern, case=False, na=False
+    )
     intereses = abs(float(data.eri.loc[intereses_mask, data.current_month_col].sum()))
-
-    ingresos_actual = abs(float(budget.summary.loc[0, f"Actual {data.current_month}"]))
     
-    # Calculate financial ratios
-    current_ratio = current_assets / current_liabilities if current_liabilities else 0.0
+    return depreciacion, intereses
+
+
+def _calculate_financial_ratios(
+    current_assets: float,
+    current_liabilities: float,
+    inventories: float,
+    equity: float,
+    ingresos: float,
+    costos: float,
+    utilidad: float
+) -> dict[str, float]:
+    """Calculate all financial ratios with division by zero protection.
+    
+    Args:
+        current_assets: Current assets amount
+        current_liabilities: Current liabilities amount
+        inventories: Inventories amount
+        equity: Equity amount
+        ingresos: Income amount
+        costos: Costs amount
+        utilidad: Profit amount
+        
+    Returns:
+        Dictionary of calculated ratios
+    """
+    # Liquidity ratios
+    current_ratio = current_assets / current_liabilities if current_liabilities > 0 else 0.0
     quick_ratio = (
-        (current_assets - inventories) / current_liabilities if current_liabilities else 0.0
+        (current_assets - inventories) / current_liabilities if current_liabilities > 0 else 0.0
     )
-    margen_bruto = (
-        ((ingresos_actual - costos) / ingresos_actual) * 100 if ingresos_actual else 0.0
-    )
-    margen_neto = (utilidad / ingresos_actual * 100) if ingresos_actual else 0.0
-    roe = (utilidad / equity * 100) if equity else 0.0
-    deuda_patrimonio = current_liabilities / equity if equity else 0.0
-    rotacion_inventarios = costos / inventories if inventories else 0.0
     
-    # Enhanced EBITDA calculation: utilidad + depreciación + intereses
-    ebitda = utilidad + depreciacion + intereses
-
-    metrics = {
+    # Profitability ratios
+    margen_bruto = (
+        ((ingresos - costos) / ingresos) * 100 if ingresos > 0 else 0.0
+    )
+    margen_neto = (utilidad / ingresos * 100) if ingresos > 0 else 0.0
+    roe = (utilidad / equity * 100) if equity > 0 else 0.0
+    
+    # Leverage ratios
+    deuda_patrimonio = current_liabilities / equity if equity > 0 else 0.0
+    
+    # Activity ratios
+    rotacion_inventarios = costos / inventories if inventories > 0 else 0.0
+    
+    return {
         "Current Ratio": round(current_ratio, 2),
         "Quick Ratio": round(quick_ratio, 2),
         "Margen Bruto %": round(margen_bruto, 2),
@@ -217,14 +395,51 @@ def compute_kpis(data: FinancialData, budget: BudgetResult) -> KPIResult:
         "ROE %": round(roe, 2),
         "Deuda/Patrimonio": round(deuda_patrimonio, 2),
         "Rotación Inventarios": round(rotacion_inventarios, 2),
-        "EBITDA": round(ebitda, 2),
     }
 
+
+def compute_kpis(data: FinancialData, budget: BudgetResult) -> KPIResult:
+    """Calculate comprehensive financial KPIs.
+    
+    Args:
+        data: Financial data containing balance sheet and income statement
+        budget: Budget execution results with categorized expenses
+        
+    Returns:
+        KPIResult containing calculated metrics table and dictionary
+    """
+    balance = data.balance
+    resultado = data.resultado
+
+    # Get assets, liabilities, and equity from Clase level
+    total_assets = _sum_for_balance(balance, "Clase", [ASSET_CLASS_CODE])
+    current_assets = _sum_for_balance(balance, "Grupo", CURRENT_ASSET_GROUPS)
+    inventories = _sum_for_balance(balance, "Grupo", [INVENTORY_GROUP_CODE])
+    current_liabilities = abs(_sum_for_balance(balance, "Clase", [LIABILITY_CLASS_CODE]))
+    equity = abs(_sum_for_balance(balance, "Clase", [EQUITY_CLASS_CODE])) or max(total_assets - current_liabilities, 0)
+
+    # Get income statement data
+    costos, utilidad, ingresos = _get_income_statement_data(resultado, data.resultado_current_col)
+
+    # Calculate EBITDA components
+    depreciacion, intereses = _calculate_ebitda_components(data)
+    
+    # Calculate financial ratios
+    ratios = _calculate_financial_ratios(
+        current_assets, current_liabilities, inventories, equity, 
+        ingresos, costos, utilidad
+    )
+    
+    # Add EBITDA to ratios
+    ebitda = utilidad + depreciacion + intereses
+    ratios["EBITDA"] = round(ebitda, 2)
+
+    # Create results table
     table = pd.DataFrame(
         {
-            "KPI": list(metrics.keys()),
-            f"Valor {data.current_month} 2025": list(metrics.values()),
+            "KPI": list(ratios.keys()),
+            f"Valor {data.current_month} 2025": list(ratios.values()),
         }
     )
 
-    return KPIResult(table=table, metrics=metrics)
+    return KPIResult(table=table, metrics=ratios)

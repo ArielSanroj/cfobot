@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  cfobot:
+    build: .
+    container_name: cfobot
+    volumes:
+      # Mount downloads directory for file access
+      - ./downloads:/home/cfobot/Downloads
+      # Mount output directory for generated reports
+      - ./outputs:/home/cfobot/outputs
+    environment:
+      # Email configuration (set these in .env file)
+      - CFOBOT_EMAIL_SENDER=${CFOBOT_EMAIL_SENDER:-}
+      - CFOBOT_EMAIL_PASSWORD=${CFOBOT_EMAIL_PASSWORD:-}
+      - CFOBOT_EMAIL_RECIPIENT=${CFOBOT_EMAIL_RECIPIENT:-}
+      - CFOBOT_EMAIL_SMTP_SERVER=${CFOBOT_EMAIL_SMTP_SERVER:-smtp.gmail.com}
+      - CFOBOT_EMAIL_SMTP_PORT=${CFOBOT_EMAIL_SMTP_PORT:-587}
+    command: ["python", "cfobot.py", "--verbose"]
+    restart: unless-stopped
+
+  # Development service with live reloading
+  cfobot-dev:
+    build: .
+    container_name: cfobot-dev
+    volumes:
+      - .:/app
+      - ./downloads:/home/cfobot/Downloads
+      - ./outputs:/home/cfobot/outputs
+    environment:
+      - CFOBOT_EMAIL_SENDER=${CFOBOT_EMAIL_SENDER:-}
+      - CFOBOT_EMAIL_PASSWORD=${CFOBOT_EMAIL_PASSWORD:-}
+      - CFOBOT_EMAIL_RECIPIENT=${CFOBOT_EMAIL_RECIPIENT:-}
+      - CFOBOT_EMAIL_SMTP_SERVER=${CFOBOT_EMAIL_SMTP_SERVER:-smtp.gmail.com}
+      - CFOBOT_EMAIL_SMTP_PORT=${CFOBOT_EMAIL_SMTP_PORT:-587}
+    command: ["python", "-m", "pytest", "tests/", "-v"]
+    profiles:
+      - dev
+
+  # Testing service
+  cfobot-test:
+    build: .
+    container_name: cfobot-test
+    volumes:
+      - .:/app
+    environment:
+      - PYTHONPATH=/app
+    command: ["python", "-m", "pytest", "tests/", "--cov=cfobot", "--cov-report=html", "--cov-report=term"]
+    profiles:
+      - test
+
+  # Linting service
+  cfobot-lint:
+    build: .
+    container_name: cfobot-lint
+    volumes:
+      - .:/app
+    command: ["python", "-m", "flake8", "cfobot", "tests"]
+    profiles:
+      - lint
+
+  # Type checking service
+  cfobot-typecheck:
+    build: .
+    container_name: cfobot-typecheck
+    volumes:
+      - .:/app
+    command: ["python", "-m", "mypy", "cfobot"]
+    profiles:
+      - typecheck
+
+networks:
+  default:
+    name: cfobot-network

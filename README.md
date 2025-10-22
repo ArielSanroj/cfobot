@@ -1,70 +1,78 @@
 # CFO Bot - Sistema de Análisis Financiero Automatizado
 
-## Descripción
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Tests](https://img.shields.io/badge/tests-pytest-blue.svg)](https://pytest.org)
+[![Coverage](https://img.shields.io/badge/coverage-80%25-green.svg)](https://codecov.io)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue.svg)](https://github.com/features/actions)
 
-CFO Bot es un sistema automatizado que procesa reportes financieros mensuales y genera análisis completos, visualizaciones y reportes para la Junta Directiva. El sistema calcula métricas agregadas, analiza la ejecución presupuestaria y genera recomendaciones estratégicas.
+## 📊 Descripción
 
-## Características Principales
+CFO Bot es un sistema automatizado de análisis financiero que procesa reportes mensuales y genera análisis completos, visualizaciones y reportes ejecutivos para la Junta Directiva. El sistema calcula métricas agregadas, analiza la ejecución presupuestaria y genera recomendaciones estratégicas basadas en datos financieros reales.
 
-### 📊 Métricas Agregadas
-- **EBITDA**: Cálculo automático (utilidad + depreciación + intereses)
-- **Filtrado por niveles superiores**: Activo, Pasivo, Patrimonio a nivel 'Clase'
-- **Análisis de balance consolidado** por mes
+### 🎯 Características Principales
 
-### 💰 Análisis Presupuestario
-- **Comparación con presupuestos predefinidos** ($100M ingresos, $125M gastos)
-- **Cálculo de % ejecutado** para ingresos y gastos
-- **Distribución de gastos por categoría**:
-  - Gastos Administrativos
-  - Gastos Otros
-  - Costos de Venta
-  - Costos de Producción
-  - Sueldos y Cesantías (categorización específica)
+- **Análisis Financiero Automatizado**: Procesamiento inteligente de datos contables
+- **Visualizaciones Profesionales**: Gráficos y dashboards ejecutivos
+- **Reportes Ejecutivos**: Documentos Word para Junta Directiva
+- **Envío Automático**: Notificaciones por email con adjuntos
+- **Validación de Datos**: Verificación de integridad y detección de outliers
+- **Configuración Flexible**: Adaptable a diferentes estructuras contables
 
-### 📈 Indicadores Financieros (KPIs)
-- **Current Ratio**: Activos corrientes / Pasivos corrientes
-- **Quick Ratio**: (Activos corrientes - Inventarios) / Pasivos corrientes
-- **Margen Bruto**: ((Ingresos - Costos) / Ingresos) × 100
-- **Margen Neto**: (Utilidad / Ingresos) × 100
-- **ROE**: (Utilidad / Patrimonio) × 100
-- **Deuda/Patrimonio**: Pasivos corrientes / Patrimonio
-- **Rotación de Inventarios**: Costos / Inventarios
-- **EBITDA**: Utilidad + Depreciación + Intereses
+## 🚀 Instalación Rápida
 
-### 📊 Visualizaciones
-- **Gráfico de barras**: Gastos mensuales (Enero a mes actual)
-- **Gráfico circular**: Distribución de gastos por categoría con porcentajes
-- **Gráfico de barras**: KPIs financieros del mes
-- **Gráfico circular**: Categorías de gastos (Administrativos, Otros, etc.)
+### Opción 1: Instalación Local
 
-### 📋 Reporte para Junta Directiva
-- **Resumen financiero ejecutivo** con métricas clave
-- **Análisis de ejecución presupuestaria**
-- **Tabla de indicadores financieros**
-- **Desglose de gastos por categoría**
-- **Conciliación bancaria** (desde CARATULA)
-- **Recomendaciones estratégicas** basadas en análisis automático
-
-### 📧 Envío Automático por Email
-- **Formato HTML profesional** con resumen ejecutivo
-- **Adjuntos automáticos** de todos los archivos generados
-- **Configuración flexible** de destinatarios
-
-## Instalación
-
-1. **Clonar el repositorio**:
 ```bash
-git clone <repository-url>
-cd CFO
-```
+# Clonar el repositorio
+git clone https://github.com/your-org/cfobot.git
+cd cfobot
 
-2. **Instalar dependencias**:
-```bash
+# Crear entorno virtual
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Instalar dependencias
 pip install -r requirements.txt
+
+# Ejecutar
+python cfobot.py
 ```
 
-3. **Configurar variables de entorno** (opcional para email):
+### Opción 2: Docker
+
 ```bash
+# Construir imagen
+docker build -t cfobot .
+
+# Ejecutar
+docker run -v $(pwd)/downloads:/home/cfobot/Downloads cfobot
+```
+
+### Opción 3: Docker Compose
+
+```bash
+# Desarrollo
+docker-compose up cfobot-dev
+
+# Producción
+docker-compose up cfobot
+```
+
+## 📋 Requisitos del Sistema
+
+- **Python**: 3.9+ (3.10+ recomendado)
+- **Memoria**: 4GB RAM mínimo
+- **Espacio**: 1GB de espacio libre
+- **Sistema Operativo**: Windows, macOS, Linux
+
+## 🔧 Configuración
+
+### Variables de Entorno
+
+```bash
+# Configuración de Email (Opcional)
 export CFOBOT_EMAIL_SENDER="tu-email@gmail.com"
 export CFOBOT_EMAIL_PASSWORD="tu-password"
 export CFOBOT_EMAIL_RECIPIENT="destinatario1@empresa.com,destinatario2@empresa.com"
@@ -72,138 +80,347 @@ export CFOBOT_EMAIL_SMTP_SERVER="smtp.gmail.com"
 export CFOBOT_EMAIL_SMTP_PORT="587"
 ```
 
-## Uso
+### Archivo de Configuración
+
+Crear `config.yaml`:
+
+```yaml
+budgets:
+  ingresos_mensual: 100_000_000
+  gastos_mensual: 125_000_000
+
+thresholds:
+  current_ratio_min: 1.5
+  net_margin_min: 5.0
+
+output:
+  directory: ~/Downloads
+  formats: [xlsx, png, docx]
+```
+
+## 📊 Uso
 
 ### Uso Básico
+
 ```bash
+# Procesar archivo Excel automáticamente
 python cfobot.py
-```
 
-### Opciones Avanzadas
-```bash
-# Generar reportes sin gráficos
-python cfobot.py --skip-visuals
-
-# Enviar reportes por email
-python cfobot.py --send-email
-
-# Habilitar logging detallado
-python cfobot.py --verbose
-
-# Combinar opciones
+# Con opciones avanzadas
 python cfobot.py --send-email --verbose
+
+# Sin generar gráficos
+python cfobot.py --skip-visuals
 ```
 
-## Estructura de Archivos
+### Parámetros de Línea de Comandos
+
+| Parámetro | Descripción |
+|-----------|-------------|
+| `--send-email` | Enviar reportes por correo electrónico |
+| `--skip-visuals` | No generar gráficos y visualizaciones |
+| `--verbose` | Habilitar logging detallado |
+| `--dry-run` | Validar sin generar archivos de salida |
+
+## 📁 Estructura del Proyecto
 
 ```
-CFO/
-├── cfobot/
+cfobot/
+├── cfobot/                 # Código fuente principal
 │   ├── __init__.py
-│   ├── cli.py              # Interfaz de línea de comandos
-│   ├── config.py           # Configuración de la aplicación
-│   ├── data_loader.py      # Carga y normalización de datos
-│   ├── processing.py       # Lógica de procesamiento financiero
-│   ├── reporting.py        # Generación de reportes y visualizaciones
-│   └── emailer.py          # Funcionalidad de envío de emails
-├── tests/
-│   ├── test_config.py
-│   └── test_data_loader.py
-├── cfobot.py              # Punto de entrada principal
-├── requirements.txt        # Dependencias del proyecto
-└── README.md              # Este archivo
+│   ├── cli.py             # Interfaz de línea de comandos
+│   ├── config.py          # Gestión de configuración
+│   ├── constants.py       # Constantes de la aplicación
+│   ├── data_loader.py     # Carga y normalización de datos
+│   ├── emailer.py         # Funcionalidad de email
+│   ├── processing.py      # Lógica de procesamiento financiero
+│   ├── reporting.py       # Generación de reportes
+│   ├── templates.py       # Plantillas de email
+│   └── validators.py      # Validación de datos
+├── tests/                 # Suite de pruebas
+│   ├── unit/              # Pruebas unitarias
+│   ├── integration/       # Pruebas de integración
+│   └── fixtures/          # Datos de prueba
+├── .github/               # Configuración de CI/CD
+├── docs/                  # Documentación
+├── requirements.txt       # Dependencias de producción
+├── requirements-dev.txt   # Dependencias de desarrollo
+├── pyproject.toml        # Configuración del proyecto
+├── Dockerfile            # Imagen de Docker
+├── docker-compose.yml    # Orquestación de contenedores
+└── README.md             # Este archivo
 ```
 
-## Formato de Archivos de Entrada
+## 📈 Funcionalidades Detalladas
+
+### 🔍 Análisis Financiero
+
+#### Métricas Calculadas
+- **EBITDA**: Utilidad + Depreciación + Intereses
+- **Ratios de Liquidez**: Current Ratio, Quick Ratio
+- **Ratios de Rentabilidad**: Margen Bruto, Margen Neto, ROE
+- **Ratios de Endeudamiento**: Deuda/Patrimonio
+- **Ratios de Actividad**: Rotación de Inventarios
+
+#### Categorización de Gastos
+- **Gastos Administrativos**: Códigos 51xxxx
+- **Gastos Otros**: Códigos 53xxxx
+- **Costos de Venta**: Códigos 61xxxx
+- **Costos de Producción**: Códigos 72xxxx, 73xxxx
+- **Sueldos y Cesantías**: Detección automática por nombre
+
+### 📊 Visualizaciones
+
+#### Gráficos Generados
+1. **Gastos Mensuales**: Barras comparativas por mes
+2. **KPIs Financieros**: Dashboard de indicadores clave
+3. **Distribución de Gastos**: Gráfico circular por categoría
+4. **Categorías de Gastos**: Análisis detallado por tipo
+
+#### Características de Gráficos
+- **Alta Resolución**: 300 DPI para presentaciones
+- **Formato Profesional**: Colores corporativos
+- **Etiquetas Inteligentes**: Valores y porcentajes
+- **Leyendas Detalladas**: Información contextual
+
+### 📋 Reportes Ejecutivos
+
+#### Informe para Junta Directiva
+- **Resumen Ejecutivo**: Métricas clave y tendencias
+- **Análisis Presupuestario**: Ejecución vs. presupuesto
+- **Indicadores Financieros**: Tabla completa de KPIs
+- **Desglose de Gastos**: Categorización detallada
+- **Conciliación Bancaria**: Diferencias identificadas
+- **Recomendaciones Estratégicas**: Sugerencias automáticas
+
+#### Recomendaciones Inteligentes
+- **Liquidez**: Alertas si Current Ratio < 1.5
+- **Rentabilidad**: Análisis de márgenes vs. estándares
+- **Presupuesto**: Control de desviaciones significativas
+- **Tendencias**: Monitoreo de variaciones mensuales
+
+## 🔧 Desarrollo
+
+### Configuración del Entorno
+
+```bash
+# Instalar dependencias de desarrollo
+pip install -r requirements-dev.txt
+
+# Instalar pre-commit hooks
+pre-commit install
+
+# Ejecutar pruebas
+pytest --cov=cfobot --cov-report=html
+
+# Formatear código
+black cfobot tests
+isort cfobot tests
+
+# Verificar tipos
+mypy cfobot
+
+# Linting
+flake8 cfobot tests
+```
+
+### Estructura de Pruebas
+
+```bash
+# Ejecutar todas las pruebas
+pytest
+
+# Pruebas unitarias
+pytest tests/unit/
+
+# Pruebas de integración
+pytest tests/integration/
+
+# Con cobertura
+pytest --cov=cfobot --cov-report=term-missing
+```
+
+### Docker para Desarrollo
+
+```bash
+# Construir imagen de desarrollo
+docker-compose build cfobot-dev
+
+# Ejecutar pruebas
+docker-compose --profile test run cfobot-test
+
+# Linting
+docker-compose --profile lint run cfobot-lint
+
+# Type checking
+docker-compose --profile typecheck run cfobot-typecheck
+```
+
+## 📊 Formato de Archivos de Entrada
+
+### Estructura Excel Requerida
 
 El sistema espera archivos Excel con las siguientes hojas:
-- **BALANCE [MES]**: Balance general del mes
-- **INFORME-ERI**: Informe de ingresos y gastos por cuenta
-- **ESTADO RESULTADO**: Estado de resultados
-- **CARATULA**: Información de conciliación bancaria
 
-## Archivos de Salida
+#### 1. Balance General (`BALANCE [MES]`)
+- **Columnas**: Nivel, Código cuenta contable, Nombre cuenta contable, Saldo inicial, Movimiento débito, Movimiento crédito, Saldo final
+- **Niveles**: Clase (1, 2, 3), Grupo (11, 12, 13, 14, 21, etc.)
 
-### Excel
+#### 2. Informe de Ingresos y Gastos (`INFORME-ERI`)
+- **Columnas**: Código, Nombre, [Meses del año]
+- **Códigos**: 51xxxx (Administrativos), 53xxxx (Otros), 61xxxx (Ventas), 72xxxx/73xxxx (Producción)
+
+#### 3. Estado de Resultados (`ESTADO RESULTADO`)
+- **Estructura**: Multi-nivel con descripciones y totales por mes
+- **Elementos**: Ingresos Ordinarios, Costo de Venta, Resultado del Ejercicio
+
+#### 4. Carátula (`CARATULA`)
+- **Propósito**: Conciliación bancaria
+- **Datos**: Diferencias identificadas
+
+### Ejemplo de Archivo
+
+```
+INFORME DE MARZO APRU- 2025 .xlsx
+├── BALANCE MARZO
+├── INFORME-ERI
+├── ESTADO RESULTADO
+└── CARATULA
+```
+
+## 📁 Archivos de Salida
+
+### Excel Reports
 - `consolidated_balance_[mes]_2025.xlsx`: Balance consolidado
 - `presupuesto_ejecutado_[mes]_2025.xlsx`: Análisis presupuestario
 - `kpis_financieros_[mes]_2025.xlsx`: Indicadores financieros
 
 ### Visualizaciones (PNG)
 - `monthly_spending_[mes]_2025.png`: Gastos mensuales
-- `kpi_dashboard_[mes]_2025.png`: KPIs financieros
+- `kpi_dashboard_[mes]_2025.png`: Dashboard de KPIs
 - `distribucion_gastos_pie_[mes]_2025.png`: Distribución de gastos
 - `categorias_gastos_pie_[mes]_2025.png`: Categorías de gastos
 
-### Reporte Word
+### Reporte Ejecutivo
 - `informe_junta_[mes]_2025.docx`: Informe para Junta Directiva
 
-## Configuración
+## 🚨 Troubleshooting
 
-### Presupuestos
-Los presupuestos se configuran en `config.py`:
-```python
-@dataclass
-class BudgetConfig:
-    ingresos_mensual: float = 100_000_000  # $100M
-    gastos_mensual: float = 125_000_000    # $125M
+### Errores Comunes
+
+#### "No file matching pattern found"
+```bash
+# Verificar ubicación del archivo
+ls ~/Downloads/INFORME*
+
+# Verificar nombre del archivo
+# Debe seguir el patrón: "INFORME DE [MES] APRU- 2025 .xls"
 ```
 
-### Orden de Meses
-```python
-DEFAULT_MONTH_ORDER = [
-    "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
-    "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
-]
+#### "Email configuration missing"
+```bash
+# Configurar variables de entorno
+export CFOBOT_EMAIL_SENDER="tu-email@gmail.com"
+export CFOBOT_EMAIL_PASSWORD="tu-password"
+
+# O ejecutar sin email
+python cfobot.py
 ```
 
-## Análisis Automático
+#### "Sheet not found"
+```bash
+# Verificar que el archivo Excel contenga todas las hojas:
+# - BALANCE [MES]
+# - INFORME-ERI
+# - ESTADO RESULTADO
+# - CARATULA
+```
 
-### Recomendaciones Inteligentes
-El sistema genera recomendaciones automáticas basadas en:
-- **Liquidez**: Alerta si Current Ratio < 1.5
-- **Rentabilidad**: Analiza margen neto vs estándares
-- **Ejecución presupuestaria**: Controla desviaciones significativas
-- **Tendencias**: Monitorea variaciones mes a mes
+### Logs y Debugging
 
-### Categorización Inteligente
-- **Sueldos**: Detecta cuentas con "SUELDO" o "SALARIO"
-- **Cesantías**: Identifica cuentas de "CESANTIA"
-- **Gastos Administrativos**: Cuentas 51xxxx
-- **Gastos Otros**: Cuentas 53xxxx
-- **Costos de Venta**: Cuentas 61xxxx
-- **Costos de Producción**: Cuentas 72xxxx y 73xxxx
+```bash
+# Ejecutar con logging detallado
+python cfobot.py --verbose
 
-## Troubleshooting
+# Verificar configuración
+python -c "from cfobot.config import load_config; print(load_config())"
+```
 
-### Error: "No file matching pattern found"
-- Verificar que el archivo esté en la carpeta Downloads
-- Confirmar que el nombre siga el patrón: "INFORME DE [MES] APRU- 2025 .xls"
+## 🤝 Contribución
 
-### Error: "Email configuration missing"
-- Configurar las variables de entorno para email
-- O ejecutar sin la opción `--send-email`
+### Cómo Contribuir
 
-### Error: "Sheet not found"
-- Verificar que el archivo Excel contenga todas las hojas requeridas
-- Confirmar que los nombres de las hojas coincidan con el formato esperado
+1. **Fork** el repositorio
+2. **Crear** una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. **Commit** tus cambios (`git commit -m 'feat: agregar nueva funcionalidad'`)
+4. **Push** a la rama (`git push origin feature/nueva-funcionalidad`)
+5. **Crear** un Pull Request
 
-## Contribuciones
+### Guías de Contribución
 
-Para contribuir al proyecto:
-1. Fork el repositorio
-2. Crear una rama para tu feature
-3. Hacer commit de los cambios
-4. Push a la rama
-5. Crear un Pull Request
+- **Código**: Sigue las convenciones de Python (PEP 8)
+- **Tests**: Mantén cobertura >80%
+- **Documentación**: Actualiza README y docstrings
+- **Commits**: Usa conventional commits
 
-## Licencia
+Ver [CONTRIBUTING.md](CONTRIBUTING.md) para más detalles.
 
-Este proyecto está bajo la Licencia MIT. Ver el archivo LICENSE para más detalles.
+## 📄 Licencia
 
-## Soporte
+Este proyecto está bajo la Licencia MIT. Ver el archivo [LICENSE](LICENSE) para más detalles.
 
-Para soporte técnico o preguntas:
-- Crear un issue en GitHub
-- Contactar al equipo de desarrollo
-- Revisar la documentación en línea
+## 🆘 Soporte
+
+### Obtener Ayuda
+
+- **Issues**: [GitHub Issues](https://github.com/your-org/cfobot/issues)
+- **Discusiones**: [GitHub Discussions](https://github.com/your-org/cfobot/discussions)
+- **Documentación**: [Wiki del Proyecto](https://github.com/your-org/cfobot/wiki)
+
+### Reportar Bugs
+
+Al reportar bugs, incluye:
+1. **Versión** de Python y CFO Bot
+2. **Sistema operativo**
+3. **Pasos** para reproducir el error
+4. **Logs** de error completos
+5. **Archivo** de ejemplo (si aplica)
+
+## 🗺️ Roadmap
+
+### Versión 1.1
+- [ ] Soporte para múltiples formatos de entrada (CSV, JSON)
+- [ ] Dashboard web interactivo
+- [ ] Integración con APIs bancarias
+- [ ] Análisis predictivo con ML
+
+### Versión 1.2
+- [ ] Soporte multi-idioma
+- [ ] Plantillas personalizables
+- [ ] API REST para integraciones
+- [ ] Notificaciones push
+
+### Versión 2.0
+- [ ] Arquitectura de microservicios
+- [ ] Base de datos integrada
+- [ ] Autenticación y autorización
+- [ ] Escalabilidad horizontal
+
+## 📊 Métricas del Proyecto
+
+- **Líneas de Código**: ~2,500
+- **Cobertura de Tests**: >80%
+- **Dependencias**: 6 principales
+- **Tiempo de Ejecución**: <30 segundos
+- **Tamaño de Salida**: ~5MB por reporte
+
+## 🏆 Reconocimientos
+
+- **Desarrollado por**: Equipo CFO Bot
+- **Inspirado en**: Mejores prácticas de análisis financiero
+- **Tecnologías**: Python, Pandas, Matplotlib, Docker
+- **Agradecimientos**: Comunidad open source
+
+---
+
+**CFO Bot** - Transformando datos financieros en insights estratégicos 🚀

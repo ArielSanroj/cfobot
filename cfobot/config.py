@@ -55,9 +55,9 @@ class EmailConfig:
         if not sender or not password or not recipient:
             return None
 
-        recipients: Iterable[str] = {
+        recipients: list[str] = [
             email.strip() for email in recipient.split(",") if email.strip()
-        }
+        ]
 
         return cls(
             smtp_server=os.getenv("CFOBOT_EMAIL_SMTP_SERVER", "smtp.gmail.com"),

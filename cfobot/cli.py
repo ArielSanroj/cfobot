@@ -17,6 +17,7 @@ from .reporting import (
     save_kpis,
 )
 from .emailer import send_reports
+from .templates import build_email_html
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -60,67 +61,12 @@ def run_pipeline(config: AppConfig, send_email: bool, skip_visuals: bool) -> Non
 
         subject = f"Reporte CFO Automatizado - {data.current_month} 2025"
         
-        # Enhanced HTML email body
-        html_body = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                .header {{ background-color: #2c3e50; color: white; padding: 20px; border-radius: 5px; }}
-                .content {{ margin: 20px 0; }}
-                .summary {{ background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin: 10px 0; }}
-                .files {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }}
-                .footer {{ color: #7f8c8d; font-size: 12px; margin-top: 30px; }}
-                table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}
-                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-                th {{ background-color: #34495e; color: white; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>📊 Reporte Financiero Automatizado</h1>
-                <h2>{data.current_month} 2025</h2>
-            </div>
-            
-            <div class="content">
-                <div class="summary">
-                    <h3>📈 Resumen Ejecutivo</h3>
-                    <p>Se ha generado automáticamente el reporte financiero para el mes de <strong>{data.current_month} 2025</strong>.</p>
-                    <p>El sistema ha procesado los datos financieros y generado análisis detallados incluyendo:</p>
-                    <ul>
-                        <li>✅ Métricas agregadas (EBITDA, ratios financieros)</li>
-                        <li>✅ Análisis de ejecución presupuestaria</li>
-                        <li>✅ Distribución de gastos por categoría</li>
-                        <li>✅ Indicadores financieros clave (KPIs)</li>
-                        <li>✅ Visualizaciones gráficas</li>
-                        <li>✅ Informe para Junta Directiva</li>
-                    </ul>
-                </div>
-                
-                <div class="files">
-                    <h3>📁 Archivos Generados ({len(outputs)} archivos)</h3>
-                    <ul>
-        """
-        
-        # Add file list
-        for output in outputs:
-            file_type = "📊" if output.suffix == ".png" else "📄" if output.suffix == ".docx" else "📋"
-            html_body += f"<li>{file_type} {output.name}</li>"
-        
-        html_body += f"""
-                    </ul>
-                </div>
-                
-                <div class="footer">
-                    <p>Este reporte fue generado automáticamente por el Sistema CFO Bot v1.0</p>
-                    <p>Fecha de generación: {data.current_month} 2025</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
+        # Use template for HTML email body
+        html_body = build_email_html(
+            current_month=data.current_month,
+            outputs=outputs,
+            recipient_count=len(config.email.recipient_emails)
+        )
         
         send_reports(config.email, subject, html_body, outputs)
         logger.info("Email sent to %s", config.email.recipient_emails)

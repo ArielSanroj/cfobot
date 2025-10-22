@@ -1,0 +1,19 @@
+# Development dependencies for CFO Bot
+-r requirements.txt
+
+# Testing
+pytest==8.3.2
+pytest-cov==7.0.0
+pytest-mock==3.14.0
+
+# Code quality
+black==24.8.0
+isort==5.13.2
+flake8==7.1.1
+mypy==1.18.2
+
+# Type stubs
+types-PyYAML==6.0.12.20241016
+
+# Pre-commit hooks
+pre-commit==4.0.1
