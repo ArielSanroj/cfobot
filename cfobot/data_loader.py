@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import glob
-import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Mapping, Sequence
+from typing import Dict, List, Sequence
 
 import unicodedata
 
@@ -83,15 +82,94 @@ def find_latest_report(config: AppConfig, logger) -> Path:
     return Path(latest)
 
 
-def detect_current_month(file_path: Path, month_order: Sequence[str]) -> str:
-    match = re.search(r"DE (\w+) APRU", file_path.name)
-    if not match:
-        raise ValueError("Could not extract month from filename")
+def _detect_month_from_filename(file_path: Path) -> str | None:
+    return _resolve_month(file_path.name)
 
-    month = match.group(1).upper()
+
+def _detect_month_from_sheet_names(
+    sheet_names: Sequence[str],
+    month_order: Sequence[str],
+) -> str | None:
+    ordered_months = {month: index for index, month in enumerate(month_order)}
+    detected: List[str] = []
+    for sheet_name in sheet_names:
+        month = _resolve_month(sheet_name)
+        if month and month in ordered_months:
+            detected.append(month)
+
+    if not detected:
+        return None
+
+    detected = sorted(set(detected), key=lambda m: ordered_months[m])
+    return detected[-1]
+
+
+def _detect_month_from_caratula(
+    workbook: pd.ExcelFile,
+    month_order: Sequence[str],
+) -> str | None:
+    """Detect month from CARATULA sheet content."""
+    try:
+        df_caratula = pd.read_excel(workbook, sheet_name="CARATULA")
+        ordered_months = {month: index for index, month in enumerate(month_order)}
+        
+        for col in df_caratula.columns:
+            for idx, val in df_caratula[col].items():
+                if pd.notna(val):
+                    val_str = str(val).upper()
+                    for month in month_order:
+                        if month in val_str:
+                            return month
+    except Exception:
+        pass
+    return None
+
+
+def _previous_month(month: str, month_order: Sequence[str]) -> str:
     if month not in month_order:
         raise ValueError(f"Month '{month}' is not in configured month order")
-    return month
+    index = month_order.index(month)
+    return month_order[index - 1] if index > 0 else month_order[-1]
+
+
+def detect_current_month(
+    file_path: Path,
+    month_order: Sequence[str],
+    workbook: pd.ExcelFile | None = None,
+) -> str:
+    detected_month = _detect_month_from_filename(file_path)
+
+    if detected_month is None and workbook is not None:
+        # Try sheet names first
+        detected_month = _detect_month_from_sheet_names(workbook.sheet_names, month_order)
+        
+        # If still not found, try CARATULA sheet
+        if detected_month is None:
+            detected_month = _detect_month_from_caratula(workbook, month_order)
+
+    if detected_month is None:
+        raise ValueError("Could not determine report month from filename or workbook")
+
+    # Get current month from system date
+    from datetime import datetime
+    current_system_month = datetime.now().strftime("%B").upper()
+    
+    # Map English month names to Spanish
+    month_mapping = {
+        'JANUARY': 'ENERO', 'FEBRUARY': 'FEBRERO', 'MARCH': 'MARZO',
+        'APRIL': 'ABRIL', 'MAY': 'MAYO', 'JUNE': 'JUNIO',
+        'JULY': 'JULIO', 'AUGUST': 'AGOSTO', 'SEPTEMBER': 'SEPTIEMBRE',
+        'OCTOBER': 'OCTUBRE', 'NOVEMBER': 'NOVIEMBRE', 'DECEMBER': 'DICIEMBRE'
+    }
+    
+    current_system_month_spanish = month_mapping.get(current_system_month, current_system_month)
+    
+    # If detected month is the current system month, analyze the previous month
+    # Otherwise, analyze the detected month directly
+    if detected_month == current_system_month_spanish:
+        return _previous_month(detected_month, month_order)
+    else:
+        return detected_month
 
 
 def _normalize_balance(df_balance: pd.DataFrame, current_month: str, month_order: Sequence[str]) -> pd.DataFrame:
@@ -125,10 +203,23 @@ def _normalize_eri(
 
     month_index = {month: index for index, month in enumerate(month_order)}
     month_columns: List[str] = []
+    
+    # First, try to find month names in column headers
     for column in df_eri.columns:
         column_str = str(column)
         if _resolve_month(column_str) is not None:
             month_columns.append(column_str)
+    
+    # If no month columns found in headers, look in the first row of data
+    if not month_columns:
+        for col_idx, column in enumerate(df_eri.columns):
+            # Check the first few rows for month names
+            for row_idx in range(min(3, len(df_eri))):
+                cell_value = str(df_eri.iloc[row_idx, col_idx]).upper()
+                if _resolve_month(cell_value) is not None:
+                    month_columns.append(column)
+                    break
+    
     month_columns_sorted = sorted(
         month_columns,
         key=lambda col: month_index.get(_resolve_month(col) or col, float("inf")),
@@ -150,10 +241,25 @@ def _normalize_eri(
     for col in month_columns_sorted:
         df_eri[col] = pd.to_numeric(df_eri[col], errors="coerce").fillna(0)
 
-    preferred_column = next(
-        (col for col in month_columns_sorted if _resolve_month(col) == current_month),
-        None,
-    )
+    # Find the column that contains the current month data
+    preferred_column = None
+    for col in month_columns_sorted:
+        # Check if this column contains data for the current month
+        if _resolve_month(col) == current_month:
+            preferred_column = col
+            break
+    
+    # If not found by column name, look for the column with current month in the data
+    if preferred_column is None:
+        for col in df_eri.columns:
+            for row_idx in range(min(3, len(df_eri))):
+                cell_value = str(df_eri.iloc[row_idx, col]).upper()
+                if current_month in cell_value:
+                    preferred_column = col
+                    break
+            if preferred_column:
+                break
+    
     current_month_col = preferred_column or month_columns_sorted[-1]
     return df_eri, month_columns_sorted, current_month_col
 
@@ -199,7 +305,26 @@ def _normalize_resultado(
         if "Descripcion" not in df_resultado.columns:
             df_resultado.insert(0, "Descripcion", "")
         df_resultado["Descripcion"] = df_resultado["Descripcion"].astype(str).str.strip()
-        normalized = df_resultado.copy()
+        
+        # Look for month columns in the data (not just headers)
+        month_columns = []
+        for col_idx, column in enumerate(df_resultado.columns):
+            # Check the first few rows for month names
+            for row_idx in range(min(3, len(df_resultado))):
+                cell_value = str(df_resultado.iloc[row_idx, col_idx]).upper()
+                month_name = _resolve_month(cell_value)
+                if month_name and month_name in month_index:
+                    month_columns.append((column, month_name))
+                    break
+        
+        # Create normalized dataframe with month columns
+        normalized = df_resultado[["Descripcion"]].copy()
+        
+        for col, month_name in month_columns:
+            column_name = f"Total {month_name}"
+            # Get the data from the column, skipping the header rows (first 2 rows)
+            data = df_resultado[col].iloc[2:].reset_index(drop=True)
+            normalized[column_name] = pd.to_numeric(data, errors="coerce").fillna(0)
 
     total_columns = [col for col in normalized.columns if col.startswith("Total ")]
 
@@ -242,10 +367,29 @@ def load_financial_data(file_path: Path, config: AppConfig, logger) -> Financial
     workbook = pd.ExcelFile(file_path)
     logger.debug("Available sheets: %s", workbook.sheet_names)
 
+    current_month = detect_current_month(
+        file_path,
+        config.month_order,
+        workbook=workbook,
+    )
+
     # Validate all required sheets exist before processing
     required_sheets = ["INFORME-ERI", "ESTADO RESULTADO", "CARATULA"]
-    current_month = detect_current_month(file_path, config.month_order)
-    balance_sheet = f"BALANCE {current_month}"
+    
+    # Find the correct balance sheet name that matches the current month
+    balance_sheet = None
+    for sheet_name in workbook.sheet_names:
+        if sheet_name.startswith("BALANCE ") and _resolve_month(sheet_name) == current_month:
+            balance_sheet = sheet_name
+            break
+    
+    if balance_sheet is None:
+        available_sheets = ", ".join(workbook.sheet_names)
+        raise ValueError(
+            f"Could not find balance sheet for month '{current_month}'. "
+            f"Available sheets: {available_sheets}"
+        )
+    
     required_sheets.append(balance_sheet)
     
     missing_sheets = [sheet for sheet in required_sheets if sheet not in workbook.sheet_names]

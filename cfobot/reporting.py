@@ -186,6 +186,96 @@ def generate_category_pie(budget: BudgetResult, data: FinancialData) -> Path | N
     return save_path
 
 
+def build_ai_enhanced_board_report(
+    budget: BudgetResult,
+    kpis: KPIResult,
+    data: FinancialData,
+    ai_insights,
+    diferencia: float | None = None,
+) -> Path:
+    """Build AI-enhanced board report with intelligent insights.
+    
+    Args:
+        budget: Budget execution results
+        kpis: KPI results
+        data: Financial data
+        ai_insights: AI-generated insights
+        diferencia: Bank reconciliation difference
+        
+    Returns:
+        Path to generated report
+    """
+    output_path = _build_filename("informe_junta_ai", data, ".docx")
+    doc = Document()
+    doc.add_heading(f"Informe Ejecutivo con IA - {data.current_month} 2025", 0)
+
+    # AI-Enhanced Executive Summary
+    doc.add_heading("Resumen Ejecutivo con Análisis de IA", level=1)
+    doc.add_paragraph(ai_insights.executive_summary)
+
+    # Key AI Insights
+    doc.add_heading("Insights Clave de IA", level=1)
+    for insight in ai_insights.key_insights:
+        doc.add_paragraph(f"• {insight}")
+
+    # Financial Performance with AI Analysis
+    ingresos = float(budget.summary.loc[0, f"Actual {data.current_month}"])
+    gastos = float(budget.summary.loc[1, f"Actual {data.current_month}"])
+    ebitda = float(kpis.metrics.get("EBITDA", 0))
+    utilidad_neta = float(kpis.metrics.get("Margen Neto %", 0))
+    current_ratio = float(kpis.metrics.get("Current Ratio", 0))
+
+    doc.add_heading("Análisis Financiero Detallado", level=1)
+    doc.add_paragraph(
+        f"Durante el mes de {data.current_month} 2025, la empresa presentó los siguientes resultados:\n\n"
+        f"• Ingresos Totales: ${ingresos:,.0f} COP\n"
+        f"• Gastos Totales: ${gastos:,.0f} COP\n"
+        f"• EBITDA: ${ebitda:,.0f} COP\n"
+        f"• Margen Neto: {utilidad_neta:.2f}%\n"
+        f"• Ratio de Liquidez (Current Ratio): {current_ratio:.2f}"
+    )
+
+    # AI Budget Analysis
+    doc.add_heading("Análisis Presupuestario con IA", level=1)
+    doc.add_paragraph(ai_insights.budget_analysis)
+
+    # AI KPI Analysis
+    doc.add_heading("Análisis de KPIs con IA", level=1)
+    doc.add_paragraph(ai_insights.kpi_analysis)
+
+    # AI Trend Analysis
+    doc.add_heading("Análisis de Tendencias con IA", level=1)
+    doc.add_paragraph(ai_insights.trend_analysis)
+
+    # AI Risk Assessment
+    doc.add_heading("Evaluación de Riesgos con IA", level=1)
+    doc.add_paragraph(ai_insights.risk_assessment)
+
+    # AI Recommendations
+    doc.add_heading("Recomendaciones Estratégicas con IA", level=1)
+    for i, recommendation in enumerate(ai_insights.recommendations, 1):
+        doc.add_paragraph(f"{i}. {recommendation}")
+
+    # Traditional KPI table
+    doc.add_heading("Indicadores Financieros Clave (KPIs)", level=1)
+    table = doc.add_table(rows=1, cols=2)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Indicador'
+    hdr_cells[1].text = f'Valor {data.current_month} 2025'
+    
+    for kpi, valor in kpis.table.values:
+        row = table.add_row().cells
+        row[0].text = str(kpi)
+        row[1].text = str(valor)
+
+    # Add footer with AI generation info
+    doc.add_paragraph(f"\n\n---\nInforme generado con IA el {data.current_month} 2025\nSistema CFO Bot v2.0 con Ollama")
+
+    doc.save(output_path)
+    return output_path
+
+
 def build_board_report(
     budget: BudgetResult,
     kpis: KPIResult,

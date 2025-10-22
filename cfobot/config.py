@@ -26,7 +26,7 @@ DEFAULT_MONTH_ORDER: List[str] = [
 @dataclass
 class PathConfig:
     downloads_dir: Path = Path.home() / "Downloads"
-    report_pattern: str = "INFORME DE * APRU- 2025 .xls"
+    report_pattern: str = "*.xls*"
 
     def expand_pattern(self) -> str:
         return str(self.downloads_dir / self.report_pattern)
@@ -69,18 +69,36 @@ class EmailConfig:
 
 
 @dataclass
+class OllamaConfig:
+    enabled: bool = True
+    model: str = "llama3.1:8b"
+    base_url: str = "http://localhost:11434"
+    temperature: float = 0.3
+    max_tokens: int = 2000
+
+@dataclass
 class AppConfig:
     paths: PathConfig = PathConfig()
     budgets: BudgetConfig = BudgetConfig()
     month_order: List[str] = field(default_factory=lambda: DEFAULT_MONTH_ORDER.copy())
     email: EmailConfig | None = field(default=None)
     generate_visuals: bool = True
+    ollama: OllamaConfig = OllamaConfig()
 
 
 def load_config() -> AppConfig:
     """Load configuration from environment."""
 
     email_config = EmailConfig.from_env()
+    
+    # Load Ollama configuration from environment
+    ollama_config = OllamaConfig(
+        enabled=os.getenv("CFOBOT_OLLAMA_ENABLED", "true").lower() == "true",
+        model=os.getenv("CFOBOT_OLLAMA_MODEL", "llama3.1:8b"),
+        base_url=os.getenv("CFOBOT_OLLAMA_BASE_URL", "http://localhost:11434"),
+        temperature=float(os.getenv("CFOBOT_OLLAMA_TEMPERATURE", "0.3")),
+        max_tokens=int(os.getenv("CFOBOT_OLLAMA_MAX_TOKENS", "2000"))
+    )
 
-    config = AppConfig(email=email_config)
+    config = AppConfig(email=email_config, ollama=ollama_config)
     return config

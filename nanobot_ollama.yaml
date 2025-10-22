@@ -1,0 +1,15 @@
+# Nanobot configuration for CFO Bot MCP Agent with Ollama (Local AI)
+agents:
+  cfo_analyst:
+    name: "CFO Financial Analyst"
+    model: "ollama/llama3.1:latest"
+    mcpServers: 
+      - cfobot_mcp
+
+mcpServers:
+  cfobot_mcp:
+    command: "python"
+    args: ["cfo_mcp_server.py"]
+    env:
+      # Add any environment variables needed for the CFO bot
+      PYTHONPATH: "."

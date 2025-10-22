@@ -1,0 +1,3 @@
+# Additional requirements for MCP server
+# Note: MCP package requires Python 3.10+, which we have
+# We'll use a simpler approach without the official MCP package for now

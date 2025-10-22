@@ -97,12 +97,13 @@ def create_sample_excel_file(tmp_path: Path) -> Path:
     wb.remove(wb.active)
     
     # Create sheets
-    # Balance sheet
-    balance_ws = wb.create_sheet("BALANCE MARZO")
+    # Balance sheets for prior and current months
     balance_data = create_sample_balance_data()
-    for r, row in enumerate(balance_data.values, start=5):  # Start at row 5 (skiprows=4)
-        for c, value in enumerate(row, start=1):
-            balance_ws.cell(row=r, column=c, value=value)
+    for sheet_name in ["BALANCE FEBRERO", "BALANCE MARZO"]:
+        balance_ws = wb.create_sheet(sheet_name)
+        for r, row in enumerate(balance_data.values, start=5):  # Start at row 5 (skiprows=4)
+            for c, value in enumerate(row, start=1):
+                balance_ws.cell(row=r, column=c, value=value)
     
     # ERI sheet
     eri_ws = wb.create_sheet("INFORME-ERI")

@@ -282,12 +282,12 @@ class TestExcelFileProcessing:
         workbook = pd.ExcelFile(excel_file)
         
         # Verify all required sheets exist
-        required_sheets = ['BALANCE MARZO', 'INFORME-ERI', 'ESTADO RESULTADO', 'CARATULA']
+        required_sheets = ['BALANCE FEBRERO', 'BALANCE MARZO', 'INFORME-ERI', 'ESTADO RESULTADO', 'CARATULA']
         for sheet in required_sheets:
             assert sheet in workbook.sheet_names
         
         # Test reading each sheet
-        balance_df = pd.read_excel(workbook, sheet_name='BALANCE MARZO', skiprows=4)
+        balance_df = pd.read_excel(workbook, sheet_name='BALANCE FEBRERO', skiprows=4)
         eri_df = pd.read_excel(workbook, sheet_name='INFORME-ERI', skiprows=1)
         resultado_df = pd.read_excel(workbook, sheet_name='ESTADO RESULTADO', skiprows=2, header=[0, 1])
         caratula_df = pd.read_excel(workbook, sheet_name='CARATULA', skiprows=5)
